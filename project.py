@@ -75,8 +75,8 @@ class Job:
 
 
 class Pipeline:
-    def __init__(self):
-        self.con = sqlite3.connect("jt.db") 
+    def __init__(self, dbpath="jt.db"):
+        self.con = sqlite3.connect(dbpath)
         self.cur = self.con.cursor()
         self.cur.execute("PRAGMA foreign_keys = ON")
         self.cur.execute("CREATE TABLE IF NOT EXISTS Jobs (Id INTEGER UNIQUE, Title, Company_Name, Salary, Job_Type, Required_Candidate_Location, Category, Description)")
