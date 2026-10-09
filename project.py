@@ -123,11 +123,15 @@ class Pipeline:
             print("\n\033[1;31mERROR: THIS JOB ID ALREADY EXISTS IN YOUR TRACKER\033[0m")
     def adj_status(self, trackjobid, status):
             self.cur.execute("UPDATE Applications SET Status = ? WHERE Job_ID = ?", (status,trackjobid))
-            self.con.commit()
+            if self.cur.rowcount == 0:
+                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST IN YOUR TRACKER\033[0m")
+            else:self.con.commit()
     def add_note(self, trackjobid, note):
             self.cur.execute("UPDATE Applications SET Notes = ? WHERE Job_ID = ?", (note,trackjobid))
-            self.con.commit()
-        
+            if self.cur.rowcount == 0:
+                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST IN YOUR TRACKER\033[0m")
+            else:self.con.commit()
+            
 # Calls Remotive, parse JSON, returns a dict for each job.
 def fetch_jobs():
     r =requests.get("https://remotive.com/api/remote-jobs?search=")
