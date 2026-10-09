@@ -12,7 +12,17 @@ def main():
         )
 
         if userselect == "1":
-            pipeline.store_jobs()
+            while True: 
+                try:
+                    pipeline.store_jobs()
+                    break
+                except requests.RequestException as e:
+                    print(f"{e} \n\033[1;31mERROR: UNABLE TO STORE JOBS\033[0m")
+                    answer = input("Retry? (y/n): ")
+                    if answer == "y":
+                        continue
+                    else:
+                        break
         elif userselect == "2":
             category = input("Category? ")
             keyword = input("Keyword? ")
@@ -123,13 +133,13 @@ class Pipeline:
             if "UNIQUE" in str(e):
                 print("\n\033[1;31mERROR: THIS JOB ID ALREADY EXISTS IN YOUR TRACKER\033[0m")
             elif "FOREIGN KEY" in str(e):
-                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST IN YOUR TRACKER\033[0m")
+                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST. CHECK THE ID FROM BROWSE\033[0m")
             else:
                 raise
     def adj_status(self, trackjobid, status):
             self.cur.execute("UPDATE Applications SET Status = ? WHERE Job_ID = ?", (status,trackjobid))
             if self.cur.rowcount == 0:
-                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST IN YOUR TRACKER\033[0m")
+                print("\n\033[1;31mERROR: THIS JOB ID DOES NOT EXIST. CHECK THE ID FROM BROWSE\033[0m")
             else:self.con.commit()
     def add_note(self, trackjobid, note):
             self.cur.execute("UPDATE Applications SET Notes = ? WHERE Job_ID = ?", (note,trackjobid))
@@ -140,7 +150,8 @@ class Pipeline:
 
 # Calls Remotive, parse JSON, returns a dict for each job.
 def fetch_jobs():
-    r =requests.get("https://remotive.com/api/remote-jobs?search=")
+    r =requests.get("https://remotive.com/api/remote-jobs?search=", timeout=10)
+    r.raise_for_status()
     o = r.json()
     return o["jobs"]
 
