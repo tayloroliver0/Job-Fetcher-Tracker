@@ -93,7 +93,7 @@ class Pipeline:
         self.cur.execute("CREATE TABLE IF NOT EXISTS Applications (Application_ID INTEGER PRIMARY KEY AUTOINCREMENT, Job_ID INTEGER UNIQUE REFERENCES Jobs(Id), Status, Notes)")
 
     def store_jobs(self):
-        rawjobs = fetch_jobs()
+        rawjobs = normfetch_jobs()
         jobs = clean_description(jobs=rawjobs)
         filledtable = self.cur.executemany("INSERT INTO Jobs VALUES(:id, :title, :company_name, :salary, :job_type, :candidate_required_location, :category, :description) ON CONFLICT (Id) DO NOTHING",jobs)
         self.con.commit()
@@ -154,6 +154,49 @@ def fetch_jobs():
     r.raise_for_status()
     o = r.json()
     return o["jobs"]
+
+def fetch_remoteok_jobs():
+    r = requests.get("https://remoteok.com/api", timeout=10)
+    r.raise_for_status()
+    o = r.json()
+    return o[1:]
+
+def clean_salary(min, max):
+    if max == 0:
+        return "Not Listed"
+    else:
+        return f"${min} - ${max}"
+
+def normfetch_jobs():
+    remotive_jobs = fetch_jobs()
+    remoteok_jobs = fetch_remoteok_jobs()
+    normjobs = []
+    for job in remotive_jobs:
+        normjob = {
+            "id": job["id"],
+            "title": job["title"],
+            "company_name": job["company_name"],
+            "salary": job["salary"],
+            "job_type": job["job_type"],
+            "candidate_required_location": job["candidate_required_location"],
+            "category": job["category"],
+            "description": job["description"]
+        }
+        normjobs.append(normjob)
+    for job in remoteok_jobs:
+        normjob = {
+            "id": job["id"],
+            "title": job["position"],
+            "company_name": job["company"],
+            "salary": clean_salary(min=job["salary_min"], max=job["salary_max"]),
+            "job_type": None,
+            "candidate_required_location": job["location"],
+            "category": None,
+            "description": job["description"]
+        }
+        normjobs.append(normjob)
+    return normjobs
+
 
 #Cleans Description for each Job.
 def clean_description(jobs):
