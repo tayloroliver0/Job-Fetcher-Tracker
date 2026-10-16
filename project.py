@@ -148,18 +148,25 @@ class Pipeline:
             else:
                 self.con.commit()
 
-# Calls Remotive, parse JSON, returns a dict for each job.
 def fetch_jobs():
-    r =requests.get("https://remotive.com/api/remote-jobs?search=", timeout=10)
-    r.raise_for_status()
-    o = r.json()
-    return o["jobs"]
+    try:
+        r =requests.get("https://remotive.com/api/remote-jobs?search=", timeout=10)
+        r.raise_for_status()
+        o = r.json()
+        return o["jobs"]
+    except requests.ConnectionError:
+        print("\n\033[1;31mERROR: UNABLE TO CONNECT TO SERVER\033[0m")
+        raise
 
 def fetch_remoteok_jobs():
-    r = requests.get("https://remoteok.com/api", timeout=10)
-    r.raise_for_status()
-    o = r.json()
-    return o[1:]
+    try:
+        r = requests.get("https://remoteok.com/api", timeout=10)
+        r.raise_for_status()
+        o = r.json()
+        return o[1:]
+    except requests.ConnectionError:
+        print("\n\033[1;31mERROR: UNABLE TO CONNECT TO SERVER\033[0m")
+        raise
 
 def clean_salary(min, max):
     if max == 0:
