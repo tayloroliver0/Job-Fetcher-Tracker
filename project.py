@@ -12,16 +12,18 @@ def main():
         )
 
         if userselect == "1":
-            while True: 
-                try:
-                    pipeline.store_jobs()
-                    break
-                except requests.RequestException as e:
-                    print(f"{e} \n\033[1;31mERROR: UNABLE TO STORE JOBS\033[0m")
-                    answer = input("Retry? (y/n): ")
-                    if answer == "y":
-                        continue
-                    else:
+                while True: 
+                    normjobs, fails = normfetch_jobs()
+                    pipeline.store_jobs(normjobs)
+                    if fails:
+                        for name, error in fails:
+                            print(f"\033[1;31mERROR: {name}: {error}\033[0m")
+                        answer = input("Retry? (y/n): ")
+                        if answer == "y":
+                            continue  
+                        else:
+                            break
+                    if not fails:
                         break
         elif userselect == "2":
             category = input("Category? ")
@@ -92,9 +94,8 @@ class Pipeline:
         self.cur.execute("CREATE TABLE IF NOT EXISTS Jobs (Id INTEGER UNIQUE, Title, Company_Name, Salary, Job_Type, Required_Candidate_Location, Category, Description)")
         self.cur.execute("CREATE TABLE IF NOT EXISTS Applications (Application_ID INTEGER PRIMARY KEY AUTOINCREMENT, Job_ID INTEGER UNIQUE REFERENCES Jobs(Id), Status, Notes)")
 
-    def store_jobs(self):
-        rawjobs = normfetch_jobs()
-        jobs = clean_description(jobs=rawjobs)
+    def store_jobs(self, jobs):
+        jobs = clean_description(jobs=jobs)
         filledtable = self.cur.executemany("INSERT INTO Jobs VALUES(:id, :title, :company_name, :salary, :job_type, :candidate_required_location, :category, :description) ON CONFLICT (Id) DO NOTHING",jobs)
         self.con.commit()
 
@@ -175,34 +176,41 @@ def clean_salary(min, max):
         return f"${min} - ${max}"
 
 def normfetch_jobs():
-    remotive_jobs = fetch_jobs()
-    remoteok_jobs = fetch_remoteok_jobs()
     normjobs = []
-    for job in remotive_jobs:
-        normjob = {
-            "id": job["id"],
-            "title": job["title"],
-            "company_name": job["company_name"],
-            "salary": job["salary"],
-            "job_type": job["job_type"],
-            "candidate_required_location": job["candidate_required_location"],
-            "category": job["category"],
-            "description": job["description"]
-        }
-        normjobs.append(normjob)
-    for job in remoteok_jobs:
-        normjob = {
-            "id": job["id"],
-            "title": job["position"],
-            "company_name": job["company"],
-            "salary": clean_salary(min=job["salary_min"], max=job["salary_max"]),
-            "job_type": None,
-            "candidate_required_location": job["location"],
-            "category": None,
-            "description": job["description"]
-        }
-        normjobs.append(normjob)
-    return normjobs
+    fails = []
+    try:
+        remotive_jobs = fetch_jobs()
+        for job in remotive_jobs:
+            normjob = {
+                "id": job["id"],
+                "title": job["title"],
+                "company_name": job["company_name"],
+                "salary": job["salary"],
+                "job_type": job["job_type"],
+                "candidate_required_location": job["candidate_required_location"],
+                "category": job["category"],
+                "description": job["description"]
+            }
+            normjobs.append(normjob)
+    except requests.RequestException as e :
+        fails.append(("remotive", e))
+    try:
+        remoteok_jobs = fetch_remoteok_jobs()
+        for job in remoteok_jobs:
+            normjob = {
+                "id": job["id"],
+                "title": job["position"],
+                "company_name": job["company"],
+                "salary": clean_salary(min=job["salary_min"], max=job["salary_max"]),
+                "job_type": None,
+                "candidate_required_location": job["location"],
+                "category": None,
+                "description": job["description"]
+            }
+            normjobs.append(normjob)
+    except requests.RequestException as e:
+        fails.append(("remoteok", e))
+    return normjobs, fails
 
 
 #Cleans Description for each Job.
