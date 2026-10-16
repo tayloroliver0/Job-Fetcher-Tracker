@@ -31,3 +31,9 @@ def test_fetch_jobs(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_get)
     result = project.fetch_jobs()
     assert result == testrawjob
+def test_conerror(monkeypatch):
+    def mock_get(*args, **kwargs):
+        raise requests.ConnectionError
+    monkeypatch.setattr(requests, "get", mock_get)
+    with pytest.raises(requests.ConnectionError):
+        project.fetch_jobs()
