@@ -31,9 +31,32 @@ def test_fetch_jobs(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_get)
     result = project.fetch_jobs()
     assert result == testrawjob
+
 def test_conerror(monkeypatch):
     def mock_get(*args, **kwargs):
         raise requests.ConnectionError
     monkeypatch.setattr(requests, "get", mock_get)
     with pytest.raises(requests.ConnectionError):
         project.fetch_jobs()
+
+def test_normconerror(monkeypatch):
+     testjb = [{
+                "id": "2091144",
+                "title": "Content Reviewer - United States",
+                "company_name": "TELUS Digital",
+                "salary": "",
+                "job_type": "part_time",
+                "candidate_required_location": "USA",
+                "category": "customer_service",
+                "description": "We are looking for a Content Reviewer to join our team. In this role, you will be responsible for reviewing and moderating user-generated content to ensure it meets our community guidelines and standards. You will work closely with our content moderation team to maintain a safe and positive environment for our users."
+            }]
+     def ok_remotive():
+        return testjb
+     def fail_remoteok():
+        raise requests.ConnectionError
+     monkeypatch.setattr(project, "fetch_jobs", ok_remotive)
+     monkeypatch.setattr(project, "fetch_remoteok_jobs", fail_remoteok)
+     jobs, fails = project.normfetch_jobs()
+     assert jobs == testjb
+     assert len(fails) == 1
+     assert fails[0][0] == "remoteok"
