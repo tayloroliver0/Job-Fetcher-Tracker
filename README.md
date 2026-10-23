@@ -1,65 +1,83 @@
 # Job Fetcher and Application Tracker
-Oliver Taylor
-GitHub: https://github.com/tayloroliver0
-edX: tayloroliver0
-Beysour, Lebanon
-09/26/2026
-#### Video Demo: https://youtu.be/uDvNYVL4EAU
 
-#### Description:
+A command-line tool that pulls remote job listings from Remotive and Remote OK, lets you search and filter them, and tracks your applications in a local SQLite database.
 
-
-This project is a job fetcher and application tracker. Interacting with the code allows users to instantly fetch job listings, sort through them based on certain criteria and export filtered searches to CSV. The code also creates an application tracker for the user wherein they can instruct the code to add jobs and adjust their status and other features.
-
+[Watch the demo](https://youtu.be/uDvNYVL4EAU) (recorded for v1, which used Remotive only)
 
 ## Features
-- Jobs fetched directly from Remotive using its built in API.
-- A table of fetched jobs is automatically created on the first fetch, and updated duplicate free on any subsequent fetches.
-- Jobs can be filtered through and browsed with the option to export filtered shortlists as CSV.
-- An application tracker is automatically created upon addition of the first job to the tracker.
-- Application tracker allows addition of jobs, addition of custom notes, and updating status of application.
 
+- Fetches job listings from two public APIs, Remotive and Remote OK
+- If one source is down, the other source's jobs are still saved. The tool tells you which source failed and offers a retry
+- Creates the jobs table on the first fetch and adds only new listings on later fetches, so there are no duplicates
+- Filters listings by keyword and category, and exports a filtered shortlist to CSV
+- Tracks applications: add a job, update its status, and attach notes. Updating a job that isn't in your tracker shows an error instead of failing silently
 
-## Files
-- project.py (the main program)
-- test_project.py (the file that tests the main program)
-- requirements.txt (the file containing all the project dependencies)
-- README.md (the file you are reading which contains important information about how other files in the directory work and are to be used)
+## Getting started
 
+```bash
+git clone https://github.com/tayloroliver0/Job-Fetcher-Tracker.git
+cd Job-Fetcher-Tracker
+pip install -r requirements.txt
+python project.py
+```
 
-### project.py
-- The project file itself which calls a main function where a CLI is displayed.
-- When option 1 is chosen (Fetch new listings), a new Pipeline object is created wherein a table for the fetched jobs and a table for the application tracker are created. The store_jobs method then calls upon the fetch_jobs function to intake jobs from the Remotive API, parse it and format it as a list of job dictionaries and pass it to store_jobs where it calls the clean_description function passing the raw list as a parameter and cleaning the description (originally formatted in HTML). The updated list of job dictionaries (now with clean descriptions) is given to store_jobs where non-duplicate jobs are appended to the table.
-- When option 2 is selected (Browse Jobs), the user is then prompted for desired filters such as Keywords and Category. These values are then passed in as optional parameters to the list_jobs method in the Pipeline class, where depending on the passed in parameters, a SQL string is created and the relevant listings are pulled from the jobs table. The jobs are then looped through, and a Job object is created for each, wherein a str method returns the jobs characteristics as a string which is then stored in a filtered jobs list and displayed neatly in the CLI upon completion. An option to export the filtered jobs is then presented where if called, the user is prompted for a filepath then the export_shortlist function is called taking the filtered jobs and the filepath name as parameters and a CSV file is created with relevant headers and the jobs data.
-- When option 3 is selected (Application Tracker), the user is immediately prompted for the ID of the job they desire to work with and then prompted for their choice of either adding a job to the tracker, updating an existing job's status, or attaching a note to the job in the tracker. If the user opts to add the job to the tracker, the add_application method in Pipeline is called, and the job id is checked against the table, (raising an error message if it already exists) then inserted into the application tracker. The same process of inserting the given value into a given job's table is repeated with the adj_status and add_note method according to the user's selection.
+The menu offers three options:
 
+1. **Fetch new listings** pulls the latest jobs from both sources.
+2. **Browse jobs** filters listings and optionally exports them to CSV.
+3. **Application tracker** adds a job to your tracker, updates its status, or attaches a note.
 
+## Running the tests
 
+```bash
+pytest
+```
 
-### test_project.py
-- The file which tests the code's three top level functions using injected data, temporary file paths exclusive to the test's instance, and a custom class, as well as importing a class from the project file.
-- The file defines test data as variables including a test job and a test JSON.
-- The file tests the export shortlist function by creating a temporary filepath using pathlib exclusive to the instance of the test, then using testjob — a list of Job objects built at the top of the file via the imported Job class, it confirms the creation of a CSV and its containment of the complete test data in the correct format.
-- The file also tests the clean description function by injecting test data and testing its output cleans the html in the description of the test data.
-- The file then tests the fetch jobs function by defining a mock response class containing a static method which holds test data as JSON. The test then replaces requests.get itself with a fake function monkeypatch, so when the fetch job runs (and eventually calls requests.get(...) with its own hardcoded URL), it receives the MockResponse instead of a real network reply.
+## How it works
 
-### requirements.txt
-- Contains pip dependencies, used to install dependencies in one line.
+| File | Purpose |
+| --- | --- |
+| `project.py` | The main program: a command-line menu, a `Pipeline` class that manages the SQLite tables, and a `Job` class |
+| `test_project.py` | Tests for `export_shortlist`, `clean_description`, `fetch_jobs`, and the network failure paths |
+| `requirements.txt` | Python dependencies |
 
+**Fetching.** `fetch_jobs` and `fetch_remoteok_jobs` each call one API and raise an exception if the request fails. `normfetch_jobs` converts both sources into the same dictionary shape, catches each source's failure separately, and returns the jobs plus a list of failures. The menu stores whatever came back, then prints each failure and asks whether to retry. `clean_description` strips the HTML from each description, and `store_jobs` inserts only the jobs that aren't already in the table.
+
+**Browsing.** The chosen filters build a SQL query against the jobs table. Each result becomes a `Job` object that prints cleanly in the terminal, and `export_shortlist` writes the filtered jobs to a CSV file.
+
+**Tracking.** The `Pipeline` methods `add_application`, `adj_status` and `add_note` write to a separate applications table. Adding a job that is already tracked, or one that doesn't exist, gives a different clear error for each case. Updating or annotating a job that isn't tracked yet reports an error instead of doing nothing.
+
+**Testing.** The tests use temporary file paths and test data, so they never write to your real files. They replace `requests.get` and the fetch functions with fakes, so no test makes a real network request. The failure tests check that a network error escapes `fetch_jobs` and that one failing source doesn't lose the other source's jobs. `Pipeline` takes the database path as a parameter, which lets tests run against a temporary database.
 
 ## Design decisions
 
+**SQLite instead of a flat file.** I needed data that persists and can be queried and updated row by row. A flat file would have meant reading everything and writing custom filtering logic for each operation, while SQLite provides all of that built in.
 
-### Why SQLite over a flat file
-- I needed data persistence , but also needed to query and filter that data and update specific rows later. A flat file can store data, but has no built-in way to query and filter that data without having to read the whole file and build custom logic for each operation myself. SQLite has all of the above built in.
-### Why two tables instead of one
-- I originally contemplated having the Application tracker as columns in the jobs table. I ultimately decided to make them separate tables because if status/notes lived as columns on Jobs directly, every unapplied job would need placeholder values in columns that don't apply to it.
-### Why clean_description takes jobs as a parameter
-- Originally the function called fetch_jobs() internally, but while building my test I realized this would trigger a real network request every time. I therefore decided to have it take Jobs as a parameter in order to have control of the data it is fed for testing purposes without triggering a real network request
-### What I cut, and why
-- I initially planned on having a Scorer class and status_history function. Both were part of the original design (scoring job fit, logging every status change over time), and were dropped after I decided status history was not essential and just allowing the user to overwrite it as needed was not an issue. I also dropped scoring because I felt it was not necessary for v1.
+**Two tables instead of one.** I considered putting application status and notes as columns on the jobs table. I separated them because every job you haven't applied to would carry placeholder values in columns that don't apply to it.
 
+**Functions take data as parameters instead of fetching it.** `clean_description` originally called `fetch_jobs()` internally. While writing its test I realized that would trigger a real network request every time, so I passed the data in instead. I later did the same for `store_jobs`, and `Pipeline` takes its database path as a parameter for the same reason: tests can supply their own inputs.
 
-## Setup
-Install all dependencies using:
-   "pip install -r requirements.txt"
+**Errors travel to the layer that can act on them.** The fetch functions raise on failure and never print or prompt. `normfetch_jobs` collects each source's failure as data, and the menu is the only place that talks to the user. This is what lets the menu offer a retry without losing the jobs from the source that worked.
+
+**What I cut from v1.** I planned a `Scorer` class to rate job fit and a status history that logged every change. I dropped the history because letting the user overwrite a status was enough, and I dropped scoring because v1 didn't need it.
+
+## Known limitations
+
+- **Jobs are deduplicated by ID alone.** The two sources number their jobs independently, so a collision would silently skip a job. Their ID ranges don't overlap today, but nothing guarantees it.
+- **Remote OK jobs have no category or job type.** The API only provides a list of tags, so filtering by category returns Remotive jobs only.
+- **Remote OK salaries are shown as the raw range.** The API doesn't say whether a range is hourly or yearly, so I don't guess.
+- **A retry re-fetches both sources.** This is harmless because duplicates are skipped, but it makes one extra request to a source that already worked.
+
+## Roadmap
+
+- Expand test coverage to the remaining `Pipeline` methods
+- Retry only the source that failed
+- Add an AI job-fit scorer using the Anthropic API
+
+## Data sources
+
+Job listings come from [Remotive](https://remotive.com) and [Remote OK](https://remoteok.com).
+
+## Author
+
+Oliver Taylor: [github.com/tayloroliver0](https://github.com/tayloroliver0)
